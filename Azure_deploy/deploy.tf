@@ -443,7 +443,7 @@ resource "azurerm_linux_web_app" "main" {
 
   site_config {
     vnet_route_all_enabled = true   # Key-Vault-Referenzen + DB-Traffic über das VNet
-    app_command_line       = "gunicorn --bind=0.0.0.0:8000 --timeout 600 myDjangoAzureProject.wsgi"
+    app_command_line       = "gunicorn --bind=0.0.0.0:8000 --timeout 600 qm_cloud_demo.wsgi"
 
     application_stack {
       python_version = "3.14"
@@ -452,7 +452,7 @@ resource "azurerm_linux_web_app" "main" {
 
   app_settings = merge(
     {
-      "DJANGO_SETTINGS_MODULE"         = "myDjangoAzureProject.settings"
+      "DJANGO_SETTINGS_MODULE"         = "qm_cloud_demo.settings"
       "SCM_DO_BUILD_DURING_DEPLOYMENT" = "true"
       "ENABLE_ORYX_BUILD"              = "true"
       "DB_PORT"                        = "3306"
