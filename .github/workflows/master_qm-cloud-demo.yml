@@ -21,18 +21,18 @@ jobs:
     - name: Set up Python version
       uses: actions/setup-python@v1
       with:
-        python-version: '3.14'
+        python-version: '3.12'
 
     - name: Build using AppService-Build
       uses: azure/appservice-build@v2
       with:
         platform: python
-        platform-version: '3.14'
+        platform-version: '3.12'
 
     - name: Run Azure webapp deploy action using publish profile credentials
       uses: azure/webapps-deploy@v2
       with:
         app-name: qm-cloud-demo
         slot-name: Production
-        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_ABB7022C5C0D4232B3147CE59209DC28 }}
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_01C84BF6EA494C6ABF5C66BB5BE6E494 }}
 
