@@ -27,9 +27,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'qm-cloud-demo.azurewebsites.net',
+    'localhost',
+    '127.0.0.1',
+]
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.environ["DB_NAME"],
+        "USER": os.environ["DB_USER"],
+        "PASSWORD": os.environ["DB_PASSWORD"],
+        "HOST": os.environ["DB_HOST"],
+        "PORT": os.environ.get("DB_PORT", "3306"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "ssl_mode": "REQUIRED",   # Azure MySQL erzwingt TLS standardmäßig
+        },
+    }
+}
 
 # Application references
 # https://docs.djangoproject.com/en/2.1/ref/settings/#std:setting-INSTALLED_APPS
