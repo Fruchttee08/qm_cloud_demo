@@ -19,19 +19,20 @@ jobs:
 
 
     - name: Set up Python version
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v1
       with:
-        python-version: '3.14'
+        python-version: '3.12'
 
-    - name: Validate dependencies install under Python 3.14
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+    - name: Build using AppService-Build
+      uses: azure/appservice-build@v2
+      with:
+        platform: python
+        platform-version: '3.12'
 
     - name: Run Azure webapp deploy action using publish profile credentials
-      uses: azure/webapps-deploy@v3
+      uses: azure/webapps-deploy@v2
       with:
         app-name: qm-cloud-demo
         slot-name: Production
-        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_6E7DB84DA14E47BFB0BFEB7E450D3EFE }}
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B884C06620BF41B9B0151D9003B70980 }}
 
