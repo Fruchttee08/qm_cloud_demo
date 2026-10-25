@@ -47,6 +47,7 @@
   <ItemGroup>
     <Content Include=".gitignore" />
     <Content Include="Azure_deploy\deploy.tf" />
+    <Content Include="fehler.txt" />
     <Content Include="qm_cloud_demo_app\templates\qm_cloud_demo_app\index.html" />
     <Content Include="requirements.txt" />
     <Content Include="secrets.env" />
