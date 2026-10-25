@@ -31,3 +31,8 @@ bin/
 .DS_Store
 Thumbs.db
 
+#Terraform
+*.tfstate
+*.tf.*
+*.terraform
+*.terraform.*

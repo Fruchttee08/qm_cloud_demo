@@ -46,11 +46,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
+    <Content Include="Azure_deploy\deploy.tf" />
     <Content Include="qm_cloud_demo_app\templates\qm_cloud_demo_app\index.html" />
     <Content Include="requirements.txt" />
     <Content Include="secrets.env" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Azure_deploy\" />
     <Folder Include="qm_cloud_demo\" />
     <Folder Include="qm_cloud_demo_app\" />
     <Folder Include="qm_cloud_demo_app\migrations\" />
