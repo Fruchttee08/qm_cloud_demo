@@ -1,0 +1,33 @@
+# Secrets
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+
+# Virtualenv
+env/
+venv/
+.venv/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.pyproj.user
+obj/
+bin/
+
+# Sonstiges
+*.log
+.DS_Store
+Thumbs.db
+
