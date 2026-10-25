@@ -33,5 +33,5 @@ jobs:
       with:
         app-name: qm-cloud-demo
         slot-name: Production
-        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_01C84BF6EA494C6ABF5C66BB5BE6E494 }}
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4771233E394641E784D883C9D215F37B }}
 
