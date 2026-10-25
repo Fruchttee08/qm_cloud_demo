@@ -20,7 +20,7 @@ jobs:
     - name: Set up Python version
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     # Kein lokaler Oryx-Build (appservice-build) nötig: App Service baut remote
     # (App Settings: SCM_DO_BUILD_DURING_DEPLOYMENT=true, ENABLE_ORYX_BUILD=true)
