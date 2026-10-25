@@ -33,6 +33,7 @@ Thumbs.db
 
 #Terraform
 *.tfstate
+*.tfstate*
 *.tf.*
 *.terraform
 *.terraform.*
