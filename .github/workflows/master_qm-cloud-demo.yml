@@ -19,18 +19,17 @@ jobs:
 
 
     - name: Set up Python version
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
-    - name: Build using AppService-Build
-      uses: azure/appservice-build@v2
-      with:
-        platform: python
-        platform-version: '3.12'
+    - name: Validate dependencies install under Python 3.14
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
     - name: Run Azure webapp deploy action using publish profile credentials
-      uses: azure/webapps-deploy@v2
+      uses: azure/webapps-deploy@v3
       with:
         app-name: qm-cloud-demo
         slot-name: Production

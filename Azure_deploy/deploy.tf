@@ -446,7 +446,7 @@ resource "azurerm_linux_web_app" "main" {
     app_command_line       = "gunicorn --bind=0.0.0.0:8000 --timeout 600 myDjangoAzureProject.wsgi"
 
     application_stack {
-      python_version = "3.12"
+      python_version = "3.14"
     }
   }
 
@@ -477,7 +477,7 @@ resource "azurerm_app_service_source_control" "github" {
 
     code_configuration {
       runtime_stack   = "python"
-      runtime_version = "3.12"
+      runtime_version = "3.14"
     }
   }
 }
