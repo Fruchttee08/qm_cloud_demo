@@ -15,24 +15,23 @@ jobs:
     steps:
     # checkout the repo
     - name: 'Checkout Github Action'
-      uses: actions/checkout@master
-
+      uses: actions/checkout@v4
 
     - name: Set up Python version
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v5
       with:
         python-version: '3.12'
 
-    - name: Build using AppService-Build
-      uses: azure/appservice-build@v2
-      with:
-        platform: python
-        platform-version: '3.12'
+    # Kein lokaler Oryx-Build (appservice-build) nötig: App Service baut remote
+    # (App Settings: SCM_DO_BUILD_DURING_DEPLOYMENT=true, ENABLE_ORYX_BUILD=true)
+    - name: Validate dependencies
+      run: pip install -r requirements.txt
 
     - name: Run Azure webapp deploy action using publish profile credentials
-      uses: azure/webapps-deploy@v2
+      uses: azure/webapps-deploy@v3
       with:
         app-name: qm-cloud-demo
         slot-name: Production
+        package: .
         publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B884C06620BF41B9B0151D9003B70980 }}
 

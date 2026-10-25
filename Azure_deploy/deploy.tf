@@ -446,7 +446,7 @@ resource "azurerm_linux_web_app" "main" {
     app_command_line       = "gunicorn --bind=0.0.0.0:8000 --timeout 600 qm_cloud_demo.wsgi"
 
     application_stack {
-      python_version = "3.12"
+      python_version = "3.14"
     }
   }
 
@@ -465,21 +465,6 @@ resource "azurerm_linux_web_app" "main" {
     azurerm_private_endpoint.kv,
     azurerm_private_dns_zone_virtual_network_link.kv,
   ]
-}
-
-resource "azurerm_app_service_source_control" "github" {
-  app_id   = azurerm_linux_web_app.main.id
-  repo_url = "https://github.com/${var.github_owner}/${var.github_repo_name}"
-  branch   = var.github_branch
-
-  github_action_configuration {
-    generate_workflow_file = true
-
-    code_configuration {
-      runtime_stack   = "python"
-      runtime_version = "3.12"
-    }
-  }
 }
 
 # ======================= Outputs =======================
