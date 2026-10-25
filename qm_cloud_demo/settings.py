@@ -12,10 +12,10 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 import posixpath
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, 'secrets.env'))
+#load_dotenv(os.path.join(BASE_DIR, 'secrets.env'))
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,6 +34,13 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
 ]
+
+MY_SQL = {
+    'NAME': os.getenv('DB_NAME'),
+    'USER': os.getenv('DB_USER'),
+    'PASSWORD': os.getenv('DB_PASSWORD'),
+    'HOST': os.getenv('DB_HOST'),
+    }
 
 
 # Application references

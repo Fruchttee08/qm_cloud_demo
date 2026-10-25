@@ -152,7 +152,7 @@ variable "mysql_password_version" {
   default     = 1
 }
 
-# ======================= Basis =======================
+# ======================= Service Plan - Basis =======================
 
 data "azurerm_client_config" "current" {}
 
@@ -473,7 +473,7 @@ resource "azurerm_app_service_source_control" "github" {
   branch   = var.github_branch
 
   github_action_configuration {
-    generate_workflow_file = true
+    generate_workflow_file = false
 
     code_configuration {
       runtime_stack   = "python"
