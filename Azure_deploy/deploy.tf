@@ -473,7 +473,7 @@ resource "azurerm_app_service_source_control" "github" {
   branch   = var.github_branch
 
   github_action_configuration {
-    generate_workflow_file = false
+    generate_workflow_file = true
 
     code_configuration {
       runtime_stack   = "python"
