@@ -31,6 +31,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     'qm-cloud-demo.azurewebsites.net',
+    'fde-qm-cloud-demo-cugcfygkgaewetcf.z01.azurefd.net',
     'localhost',
     '127.0.0.1',
 ]
