@@ -4,7 +4,7 @@
 
 terraform {
   # Mindestversion von Terraform (nötig für ephemeral-Ressourcen und write-only-Attribute)
-  required_version
+  required_version = ">= 1.11"
 
   required_providers {
     azurerm = {
@@ -141,7 +141,7 @@ variable "deployer_ip" {
 # ---- MySQL ----
 # Servername, Admin-Benutzer, Datenbankname und Größe (SKU) des MySQL-Servers
 
-variable "mysql_server_name"
+variable "mysql_server_name" {
   description = "Global eindeutig, 3-63 Zeichen, Kleinbuchstaben, Ziffern, -"
   type        = string
   default     = "mysql-qm-cloud-demo"
