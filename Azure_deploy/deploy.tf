@@ -1,5 +1,5 @@
 # Dieses Terraform-Skript stellt die komplette Django-Demo in Azure bereit:
-#   Resource Group -> VNet (3 Subnetze) -> Key Vault (privat) -> MySQL (privat) -> Linux Web App.
+#   Resource Group -> VNet (3 Subnetze) -> Key Vault (privat) -> MySQL (privat) -> Linux Web App -> Azure Front Door (öffentlich).
 # Geheimnisse (Django SECRET_KEY, DB-Passwort) landen nur im Key Vault, nicht im Terraform-State.
 
 terraform {
@@ -234,10 +234,10 @@ resource "azurerm_subnet" "mysql" {
 
 # Subnetz für Private Endpoints (Key Vault)
 resource "azurerm_subnet" "pe" {
-  name                              = "snet-pe"
-  resource_group_name               = azurerm_resource_group.main.name
-  virtual_network_name              = azurerm_virtual_network.main.name
-  address_prefixes                  = [var.subnet_pe_prefix]
+  name                               = "snet-pe"
+  resource_group_name                = azurerm_resource_group.main.name
+  virtual_network_name               = azurerm_virtual_network.main.name
+  address_prefixes                   = [var.subnet_pe_prefix]
   # Muss für Private Endpoints deaktiviert sein
   private_endpoint_network_policies = "Disabled"
 }
@@ -288,11 +288,11 @@ resource "azurerm_user_assigned_identity" "app" {
 # Key Vault: sicherer Speicher für Passwörter und Zugangsdaten.
 # Zugriff über Azure RBAC (keine Access Policies); Netzwerkzugriff standardmäßig gesperrt.
 resource "azurerm_key_vault" "main" {
-  name                       = var.key_vault_name
-  location                   = azurerm_resource_group.main.location
-  resource_group_name        = azurerm_resource_group.main.name
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
-  sku_name                   = "standard"
+  name                        = var.key_vault_name
+  location                    = azurerm_resource_group.main.location
+  resource_group_name         = azurerm_resource_group.main.name
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  sku_name                    = "standard"
   soft_delete_retention_days = 7
   purge_protection_enabled   = false
   rbac_authorization_enabled = true   # bei "Unsupported argument": enable_rbac_authorization = true
@@ -467,14 +467,16 @@ locals {
   }
 }
 
-# Linux Web App mit Django (Python), eingebunden ins VNet, nur per HTTPS erreichbar
+# Linux Web App mit Django (Python), eingebunden ins VNet, nur per HTTPS erreichbar.
+# Öffentlicher Zugriff bleibt aktiviert für Testzwecke.
 resource "azurerm_linux_web_app" "main" {
-  name                      = var.web_app_name
-  location                  = azurerm_resource_group.main.location
-  resource_group_name       = azurerm_resource_group.main.name
-  service_plan_id           = azurerm_service_plan.main.id
-  https_only                = true
-  virtual_network_subnet_id = azurerm_subnet.app.id
+  name                            = var.web_app_name
+  location                        = azurerm_resource_group.main.location
+  resource_group_name             = azurerm_resource_group.main.name
+  service_plan_id                 = azurerm_service_plan.main.id
+  https_only                      = true
+  virtual_network_subnet_id       = azurerm_subnet.app.id
+  public_network_access_enabled   = true
 
   identity {
     type         = "UserAssigned"
@@ -511,9 +513,74 @@ resource "azurerm_linux_web_app" "main" {
   ]
 }
 
+# ======================= Azure Front Door =======================
+
+# Front Door Profile (Standard Tier)
+resource "azurerm_cdn_frontdoor_profile" "main" {
+  name                = "afd-${var.web_app_name}"
+  resource_group_name = azurerm_resource_group.main.name
+  sku_name            = "Standard_AzureFrontDoor"
+}
+
+# Front Door Endpoint (öffentlicher Zugangspunkt)
+resource "azurerm_cdn_frontdoor_endpoint" "main" {
+  name                     = "fde-${var.web_app_name}"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.main.id
+}
+
+# Origin Group (Zielgruppe für Routing und Health Checks)
+resource "azurerm_cdn_frontdoor_origin_group" "main" {
+  name                     = "og-${var.web_app_name}"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.main.id
+  session_affinity_enabled = false
+
+  load_balancing {
+    sample_size                 = 4
+    successful_samples_required = 2
+    additional_latency_in_milliseconds = 0
+  }
+
+  health_probe {
+    path                = "/"
+    protocol            = "Https"
+    request_type        = "HEAD"
+    interval_in_seconds = 100
+  }
+}
+
+# Origin (Bindung an die Azure Linux Web App)
+resource "azurerm_cdn_frontdoor_origin" "main" {
+  name                          = "origin-${var.web_app_name}"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.main.id
+  enabled                       = true
+
+  certificate_name_check_enabled = true
+  host_name                      = azurerm_linux_web_app.main.default_hostname
+  http_port                      = 80
+  https_port                     = 443
+  origin_host_header             = azurerm_linux_web_app.main.default_hostname
+  priority                       = 1
+  weight                         = 1000
+}
+
+# Route (Weiterleitung von HTTP/HTTPS-Traffic an den Origin)
+resource "azurerm_cdn_frontdoor_route" "main" {
+  name                          = "route-${var.web_app_name}"
+  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.main.id
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.main.id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.main.id]
+  enabled                       = true
+
+  forwarding_protocol    = "HttpsOnly"
+  https_redirect_enabled = true
+  patterns_to_match      = ["/*"]
+  supported_protocols    = ["Http", "Https"]
+}
+
 # ======================= Outputs =======================
 # Werte, die nach dem Deployment angezeigt werden (URL, Namen, Identity-Client-ID)
 
+output "frontdoor_url"       { value = "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}" }
 output "web_app_url"         { value = "https://${azurerm_linux_web_app.main.default_hostname}" }
 output "resource_group"      { value = azurerm_resource_group.main.name }
 output "key_vault_uri"       { value = azurerm_key_vault.main.vault_uri }
