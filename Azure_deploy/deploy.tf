@@ -1,5 +1,10 @@
+# Dieses Terraform-Skript stellt die komplette Django-Demo in Azure bereit:
+#   Resource Group -> VNet (3 Subnetze) -> Key Vault (privat) -> MySQL (privat) -> Linux Web App.
+# Geheimnisse (Django SECRET_KEY, DB-Passwort) landen nur im Key Vault, nicht im Terraform-State.
+
 terraform {
-  required_version = ">= 1.11.0"
+  # Mindestversion von Terraform (nötig für ephemeral-Ressourcen und write-only-Attribute)
+  required_version
 
   required_providers {
     azurerm = {
@@ -17,11 +22,14 @@ terraform {
   }
 }
 
+# Azure-Provider; der features-Block steuert das Verhalten beim Löschen/Neuanlegen von Key Vaults
 provider "azurerm" {
   # subscription_id = "<SUBSCRIPTION-ID>"  # oder ARM_SUBSCRIPTION_ID
 
   features {
     key_vault {
+      # Soft-Delete-Reste beim terraform destroy endgültig löschen bzw. beim Neuanlegen wiederherstellen,
+      # damit gleiche Namen sofort wieder nutzbar sind
       purge_soft_delete_on_destroy          = true
       recover_soft_deleted_key_vaults       = true
       purge_soft_deleted_secrets_on_destroy = true
@@ -32,6 +40,7 @@ provider "azurerm" {
 
 # ======================= Variablen =======================
 
+# Allgemeine Einstellungen: Azure-Region und Namen der Ressourcen
 variable "location" {
   type    = string
   default = "francecentral"
@@ -52,6 +61,7 @@ variable "web_app_name" {
   default = "qm-cloud-demo"
 }
 
+# GitHub-Repository (Besitzer, Name, Branch) der Anwendung
 variable "github_owner" {
   type    = string
   default = "Fruchttee08"
@@ -67,6 +77,7 @@ variable "github_branch" {
   default = "master"
 }
 
+# Name des Key Vaults; die validation prüft die Azure-Namensregeln schon vor dem Deployment
 variable "key_vault_name" {
   description = "Global eindeutig, 3-24 Zeichen, nur a-z, 0-9, -"
   type        = string
@@ -78,6 +89,8 @@ variable "key_vault_name" {
   }
 }
 
+# Django SECRET_KEY: ephemeral + sensitive = wird weder im State noch in Logs gespeichert.
+# Muss bei jedem Lauf (z. B. per TF_VAR_django_secret_value) übergeben werden.
 variable "django_secret_value" {
   description = "Django SECRET_KEY (wird NICHT im State gespeichert)"
   type        = string
@@ -90,6 +103,7 @@ variable "django_secret_value" {
   }
 }
 
+# Write-only-Werte werden nur geschrieben, wenn sich diese Versionsnummer ändert
 variable "django_secret_version" {
   description = "Erhöhen, um einen neuen SECRET_KEY in den Key Vault zu schreiben"
   type        = number
@@ -97,6 +111,7 @@ variable "django_secret_version" {
 }
 
 # ---- Netzwerk ----
+# Adressbereich des VNets und die drei Subnetze (jeweils /24 daraus)
 
 variable "vnet_address_space" {
   type    = string
@@ -124,8 +139,9 @@ variable "deployer_ip" {
 }
 
 # ---- MySQL ----
+# Servername, Admin-Benutzer, Datenbankname und Größe (SKU) des MySQL-Servers
 
-variable "mysql_server_name" {
+variable "mysql_server_name"
   description = "Global eindeutig, 3-63 Zeichen, Kleinbuchstaben, Ziffern, -"
   type        = string
   default     = "mysql-qm-cloud-demo"
@@ -154,13 +170,16 @@ variable "mysql_password_version" {
 
 # ======================= Service Plan - Basis =======================
 
+# Liest Tenant-ID und Object-ID des aktuell angemeldeten Benutzers/Service Principals
 data "azurerm_client_config" "current" {}
 
+# Resource Group: Container für alle Ressourcen
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group_name
   location = var.location
 }
 
+# App Service Plan: legt Rechenleistung und Betriebssystem (Linux) der Web App fest
 resource "azurerm_service_plan" "main" {
   name                = var.service_plan_name
   location            = azurerm_resource_group.main.location
@@ -171,6 +190,7 @@ resource "azurerm_service_plan" "main" {
 
 # ======================= Netzwerk =======================
 
+# Virtuelles Netzwerk: privates Netz, in dem App, Datenbank und Key-Vault-Endpoint kommunizieren
 resource "azurerm_virtual_network" "main" {
   name                = "vnet-${var.web_app_name}"
   location            = azurerm_resource_group.main.location
@@ -185,6 +205,7 @@ resource "azurerm_subnet" "app" {
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_app_prefix]
 
+  # Delegation: Subnetz gehört exklusiv dem App Service (nötig für VNet-Integration)
   delegation {
     name = "appservice"
     service_delegation {
@@ -201,6 +222,7 @@ resource "azurerm_subnet" "mysql" {
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_mysql_prefix]
 
+  # Delegation: Subnetz gehört exklusiv dem MySQL Flexible Server
   delegation {
     name = "mysqlfs"
     service_delegation {
@@ -216,16 +238,19 @@ resource "azurerm_subnet" "pe" {
   resource_group_name               = azurerm_resource_group.main.name
   virtual_network_name              = azurerm_virtual_network.main.name
   address_prefixes                  = [var.subnet_pe_prefix]
+  # Muss für Private Endpoints deaktiviert sein
   private_endpoint_network_policies = "Disabled"
 }
 
 # ---- Private DNS: Key Vault ----
 
+# Private DNS-Zone: löst den Key-Vault-Namen im VNet auf die private IP des Endpoints auf
 resource "azurerm_private_dns_zone" "kv" {
   name                = "privatelink.vaultcore.azure.net"
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Verknüpft die DNS-Zone mit dem VNet, damit die Auflösung dort funktioniert
 resource "azurerm_private_dns_zone_virtual_network_link" "kv" {
   name                  = "link-kv"
   resource_group_name   = azurerm_resource_group.main.name
@@ -235,11 +260,13 @@ resource "azurerm_private_dns_zone_virtual_network_link" "kv" {
 
 # ---- Private DNS: MySQL ----
 
+# Private DNS-Zone für MySQL; Name muss auf .private.mysql.database.azure.com enden
 resource "azurerm_private_dns_zone" "mysql" {
   name                = "${var.mysql_server_name}.private.mysql.database.azure.com"
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# VNet-Verknüpfung der MySQL-DNS-Zone
 resource "azurerm_private_dns_zone_virtual_network_link" "mysql" {
   name                  = "link-mysql"
   resource_group_name   = azurerm_resource_group.main.name
@@ -249,6 +276,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "mysql" {
 
 # ======================= Identität =======================
 
+# Managed Identity der Web App: ermöglicht passwortlosen Zugriff auf den Key Vault
 resource "azurerm_user_assigned_identity" "app" {
   name                = "id-${var.web_app_name}"
   location            = azurerm_resource_group.main.location
@@ -257,6 +285,8 @@ resource "azurerm_user_assigned_identity" "app" {
 
 # ======================= Key Vault =======================
 
+# Key Vault: sicherer Speicher für Passwörter und Zugangsdaten.
+# Zugriff über Azure RBAC (keine Access Policies); Netzwerkzugriff standardmäßig gesperrt.
 resource "azurerm_key_vault" "main" {
   name                       = var.key_vault_name
   location                   = azurerm_resource_group.main.location
@@ -277,6 +307,7 @@ resource "azurerm_key_vault" "main" {
   }
 }
 
+# Private Endpoint: gibt dem Key Vault eine private IP im Subnetz snet-pe
 resource "azurerm_private_endpoint" "kv" {
   name                = "pe-${var.key_vault_name}"
   location            = azurerm_resource_group.main.location
@@ -296,12 +327,14 @@ resource "azurerm_private_endpoint" "kv" {
   }
 }
 
+# Rolle für den Deployer: darf Secrets anlegen/ändern (nötig, damit Terraform sie schreiben kann)
 resource "azurerm_role_assignment" "deployer_secrets_officer" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Rolle für die Web App: darf Secrets nur lesen (Least Privilege)
 resource "azurerm_role_assignment" "app_secrets_user" {
   scope                            = azurerm_key_vault.main.id
   role_definition_name             = "Key Vault Secrets User"
@@ -310,6 +343,8 @@ resource "azurerm_role_assignment" "app_secrets_user" {
   skip_service_principal_aad_check = true
 }
 
+# Wartezeit: Rollenzuweisungen brauchen etwas, bis sie in Azure wirksam sind;
+# erst danach werden Secrets geschrieben bzw. von der App gelesen
 resource "time_sleep" "wait_for_rbac" {
   create_duration = "120s"
 
@@ -333,6 +368,8 @@ ephemeral "random_password" "mysql_admin" {
   min_special      = 2
 }
 
+# MySQL Flexible Server: nur privat im VNet erreichbar (kein öffentlicher Zugang).
+# Passwort wird write-only gesetzt und taucht nicht im State auf.
 resource "azurerm_mysql_flexible_server" "main" {
   name                = var.mysql_server_name
   location            = azurerm_resource_group.main.location
@@ -360,6 +397,7 @@ resource "azurerm_mysql_flexible_server" "main" {
   depends_on = [azurerm_private_dns_zone_virtual_network_link.mysql]
 }
 
+# Datenbank für die Django-Anwendung (utf8mb4 = volle Unicode-Unterstützung)
 resource "azurerm_mysql_flexible_database" "django" {
   name                = var.mysql_database_name
   resource_group_name = azurerm_resource_group.main.name
@@ -369,6 +407,7 @@ resource "azurerm_mysql_flexible_database" "django" {
 }
 
 # ======================= Secrets =======================
+# Die Web App liest diese Werte per Key-Vault-Referenz; sie stehen nie im Klartext in der App-Konfiguration.
 
 resource "azurerm_key_vault_secret" "django_secret_key" {
   name             = "django-secret-key"
@@ -416,6 +455,8 @@ resource "azurerm_key_vault_secret" "mysql_database" {
 
 # ======================= Web App =======================
 
+# Zuordnung: Name der Umgebungsvariable -> URL des Secrets (ohne feste Version,
+# so wird immer die neueste Version verwendet)
 locals {
   kv_ref = {
     SECRET_KEY  = azurerm_key_vault_secret.django_secret_key.versionless_id
@@ -426,6 +467,7 @@ locals {
   }
 }
 
+# Linux Web App mit Django (Python), eingebunden ins VNet, nur per HTTPS erreichbar
 resource "azurerm_linux_web_app" "main" {
   name                      = var.web_app_name
   location                  = azurerm_resource_group.main.location
@@ -450,6 +492,8 @@ resource "azurerm_linux_web_app" "main" {
     }
   }
 
+  # App-Einstellungen = Umgebungsvariablen der Anwendung:
+  # feste Werte plus die Key-Vault-Referenzen (@Microsoft.KeyVault(...)), die Azure beim Start auflöst
   app_settings = merge(
     {
       "DJANGO_SETTINGS_MODULE"         = "qm_cloud_demo.settings"
@@ -468,6 +512,7 @@ resource "azurerm_linux_web_app" "main" {
 }
 
 # ======================= Outputs =======================
+# Werte, die nach dem Deployment angezeigt werden (URL, Namen, Identity-Client-ID)
 
 output "web_app_url"         { value = "https://${azurerm_linux_web_app.main.default_hostname}" }
 output "resource_group"      { value = azurerm_resource_group.main.name }
