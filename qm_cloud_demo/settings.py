@@ -36,6 +36,13 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
 ]
 
+# Hinter Azure Front Door: Host und Protokoll aus den Forwarded-Headern übernehmen
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [
+    'https://fde-qm-cloud-demo-cugcfygkgaewetcf.z01.azurefd.net',
+]
+
 MY_SQL = {
     'NAME': os.getenv('DB_NAME'),
     'USER': os.getenv('DB_USER'),
