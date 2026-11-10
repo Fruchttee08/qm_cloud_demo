@@ -61,21 +61,6 @@ variable "web_app_name" {
   default = "qm-cloud-demo"
 }
 
-# GitHub-Repository (Besitzer, Name, Branch) der Anwendung
-variable "github_owner" {
-  type    = string
-  default = "Fruchttee08"
-}
-
-variable "github_repo_name" {
-  type    = string
-  default = "qm_cloud_demo"
-}
-
-variable "github_branch" {
-  type    = string
-  default = "master"
-}
 
 # Name des Key Vaults; die validation prüft die Azure-Namensregeln schon vor dem Deployment
 variable "key_vault_name" {
@@ -188,7 +173,7 @@ resource "azurerm_service_plan" "main" {
   sku_name            = "S1"   # Standard: VNet-Integration + Autoscale (Basic unterstützt kein Autoscale)
 }
 
-1 bis 3 Instanzen (0 ist bei App Service Plans nicht möglich)
+#1 bis 3 Instanzen (0 ist bei App Service Plans nicht möglich)
 resource "azurerm_monitor_autoscale_setting" "app" {
   name                = "autoscale-${var.web_app_name}"
   location            = azurerm_resource_group.main.location
