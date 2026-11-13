@@ -531,7 +531,7 @@ locals {
 }
 
 # Linux Web App mit Django (Python), eingebunden ins VNet, nur per HTTPS erreichbar.
-# Öffentlicher Zugriff bleibt aktiviert für Testzwecke.
+# Der öffentliche Endpoint bleibt für Front Door aktiv; Zugriff wird auf dieses Front-Door-Profil beschränkt.
 resource "azurerm_linux_web_app" "main" {
   name                            = var.web_app_name
   location                        = azurerm_resource_group.main.location
@@ -549,8 +549,21 @@ resource "azurerm_linux_web_app" "main" {
   key_vault_reference_identity_id = azurerm_user_assigned_identity.app.id
 
   site_config {
-    vnet_route_all_enabled = true   # Key-Vault-Referenzen + DB-Traffic über das VNet
-    app_command_line       = "gunicorn --bind=0.0.0.0:8000 --timeout 600 qm_cloud_demo.wsgi"
+    vnet_route_all_enabled        = true   # Key-Vault-Referenzen + DB-Traffic über das VNet
+    ip_restriction_default_action = "Deny"
+    app_command_line              = "gunicorn --bind=0.0.0.0:8000 --timeout 600 qm_cloud_demo.wsgi"
+
+    # Der Service-Tag ist gemeinsam genutzt; die FDID beschränkt den Zugriff auf dieses Front-Door-Profil.
+    ip_restriction {
+      name        = "AllowThisFrontDoor"
+      priority    = 100
+      action      = "Allow"
+      service_tag = "AzureFrontDoor.Backend"
+
+      headers {
+        x_azure_fdid = [azurerm_cdn_frontdoor_profile.main.resource_guid]
+      }
+    }
 
     application_stack {
       python_version = "3.14"
@@ -641,7 +654,7 @@ resource "azurerm_cdn_frontdoor_route" "main" {
 }
 
 # ======================= Outputs =======================
-# Werte, die nach dem Deployment angezeigt werden (URL, Namen, Identity-Client-ID)
+# Für den Browser ist frontdoor_url vorgesehen; direkte Zugriffe auf web_app_url werden abgewiesen.
 
 output "frontdoor_url"       { value = "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}" }
 output "web_app_url"         { value = "https://${azurerm_linux_web_app.main.default_hostname}" }
