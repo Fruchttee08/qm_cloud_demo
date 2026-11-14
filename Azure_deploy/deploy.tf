@@ -16,7 +16,7 @@ terraform {
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.7"          # ephemeral random_password
+      version = "~> 3.7" # ephemeral random_password
     }
   }
 }
@@ -217,7 +217,7 @@ resource "azurerm_service_plan" "main" {
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   os_type             = "Linux"
-  sku_name            = "S1"   # Standard: VNet-Integration + Autoscale (Basic unterstützt kein Autoscale)
+  sku_name            = "S1" # Standard: VNet-Integration + Autoscale (Basic unterstützt kein Autoscale)
 }
 
 #1 bis 3 Instanzen
@@ -344,10 +344,10 @@ resource "azurerm_subnet" "mysql" {
 
 # Subnetz für Private Endpoints (Key Vault)
 resource "azurerm_subnet" "pe" {
-  name                               = "snet-pe"
-  resource_group_name                = azurerm_resource_group.main.name
-  virtual_network_name               = azurerm_virtual_network.main.name
-  address_prefixes                   = [var.subnet_pe_prefix]
+  name                 = "snet-pe"
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.subnet_pe_prefix]
   # Muss für Private Endpoints deaktiviert sein
   private_endpoint_network_policies = "Disabled"
 }
@@ -398,14 +398,14 @@ resource "azurerm_user_assigned_identity" "app" {
 # Key Vault: sicherer Speicher für Passwörter und Zugangsdaten.
 # Zugriff über Azure RBAC (keine Access Policies); Netzwerkzugriff standardmäßig gesperrt.
 resource "azurerm_key_vault" "main" {
-  name                        = var.key_vault_name
-  location                    = azurerm_resource_group.main.location
-  resource_group_name         = azurerm_resource_group.main.name
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  sku_name                    = "standard"
+  name                       = var.key_vault_name
+  location                   = azurerm_resource_group.main.location
+  resource_group_name        = azurerm_resource_group.main.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "standard"
   soft_delete_retention_days = 7
   purge_protection_enabled   = false
-  rbac_authorization_enabled = true   # bei "Unsupported argument": enable_rbac_authorization = true
+  rbac_authorization_enabled = true # bei "Unsupported argument": enable_rbac_authorization = true
 
   # Öffentlich nur für die Deployer-IP, App greift über Private Endpoint zu
   public_network_access_enabled = true
@@ -541,13 +541,6 @@ resource "azurerm_mysql_flexible_server" "main" {
   ]
 }
 
-  lifecycle {
-    ignore_changes = [zone]   # Azure wählt die Zone selbst
-  }
-
-  depends_on = [azurerm_private_dns_zone_virtual_network_link.mysql]
-}
-
 # Datenbank für die Django-Anwendung (utf8mb4 = volle Unicode-Unterstützung)
 resource "azurerm_mysql_flexible_database" "django" {
   name                = var.mysql_database_name
@@ -573,7 +566,7 @@ resource "azurerm_key_vault_secret" "django_secret_key" {
 resource "azurerm_key_vault_secret" "mysql_password" {
   name             = "mysql-admin-password"
   key_vault_id     = azurerm_key_vault.main.id
-  value_wo         = ephemeral.random_password.mysql_admin.result   # identischer Wert wie in MySQL
+  value_wo         = ephemeral.random_password.mysql_admin.result # identischer Wert wie in MySQL
   value_wo_version = var.mysql_password_version
   content_type     = "text/plain"
 
@@ -621,13 +614,13 @@ locals {
 # Linux Web App mit Django (Python), eingebunden ins VNet, nur per HTTPS erreichbar.
 # Der öffentliche Endpoint bleibt für Front Door aktiv; Zugriff wird auf dieses Front-Door-Profil beschränkt.
 resource "azurerm_linux_web_app" "main" {
-  name                            = var.web_app_name
-  location                        = azurerm_resource_group.main.location
-  resource_group_name             = azurerm_resource_group.main.name
-  service_plan_id                 = azurerm_service_plan.main.id
-  https_only                      = true
-  virtual_network_subnet_id       = azurerm_subnet.app.id
-  public_network_access_enabled   = true
+  name                          = var.web_app_name
+  location                      = azurerm_resource_group.main.location
+  resource_group_name           = azurerm_resource_group.main.name
+  service_plan_id               = azurerm_service_plan.main.id
+  https_only                    = true
+  virtual_network_subnet_id     = azurerm_subnet.app.id
+  public_network_access_enabled = true
 
   identity {
     type         = "UserAssigned"
@@ -637,7 +630,7 @@ resource "azurerm_linux_web_app" "main" {
   key_vault_reference_identity_id = azurerm_user_assigned_identity.app.id
 
   site_config {
-    vnet_route_all_enabled        = true   # Key-Vault-Referenzen + DB-Traffic über das VNet
+    vnet_route_all_enabled        = true # Key-Vault-Referenzen + DB-Traffic über das VNet
     ip_restriction_default_action = "Deny"
     app_command_line              = "gunicorn --bind=0.0.0.0:8000 --timeout 600 qm_cloud_demo.wsgi"
 
@@ -699,8 +692,8 @@ resource "azurerm_cdn_frontdoor_origin_group" "main" {
   session_affinity_enabled = false
 
   load_balancing {
-    sample_size                 = 4
-    successful_samples_required = 2
+    sample_size                        = 4
+    successful_samples_required        = 2
     additional_latency_in_milliseconds = 0
   }
 
@@ -744,9 +737,9 @@ resource "azurerm_cdn_frontdoor_route" "main" {
 # ======================= Outputs =======================
 # Für den Browser ist frontdoor_url vorgesehen; direkte Zugriffe auf web_app_url werden abgewiesen.
 
-output "frontdoor_url"       { value = "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}" }
-output "web_app_url"         { value = "https://${azurerm_linux_web_app.main.default_hostname}" }
-output "resource_group"      { value = azurerm_resource_group.main.name }
-output "key_vault_uri"       { value = azurerm_key_vault.main.vault_uri }
-output "mysql_fqdn"          { value = azurerm_mysql_flexible_server.main.fqdn }
+output "frontdoor_url" { value = "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}" }
+output "web_app_url" { value = "https://${azurerm_linux_web_app.main.default_hostname}" }
+output "resource_group" { value = azurerm_resource_group.main.name }
+output "key_vault_uri" { value = azurerm_key_vault.main.vault_uri }
+output "mysql_fqdn" { value = azurerm_mysql_flexible_server.main.fqdn }
 output "app_identity_client" { value = azurerm_user_assigned_identity.app.client_id }
