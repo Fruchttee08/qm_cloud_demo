@@ -1,6 +1,5 @@
-# Dieses Terraform-Skript stellt die komplette Django-Demo in Azure bereit:
-#   Resource Group -> VNet (3 Subnetze) -> Key Vault (privat) -> MySQL (privat) -> Linux Web App -> Azure Front Door (öffentlich).
-# Geheimnisse (Django SECRET_KEY, DB-Passwort) landen nur im Key Vault, nicht im Terraform-State.
+# Dieses Terraform-Skript stellt die komplette Django-QM-Demo in Azure bereit:
+
 
 terraform {
   # Mindestversion von Terraform (nötig für ephemeral-Ressourcen und write-only-Attribute)
