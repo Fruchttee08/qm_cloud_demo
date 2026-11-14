@@ -142,8 +142,56 @@ variable "mysql_database_name" {
 }
 
 variable "mysql_sku" {
-  type    = string
-  default = "B_Standard_B1ms"
+  description = "MySQL-SKU; für Produktion General Purpose verwenden"
+  type        = string
+  default     = "GP_Standard_D2ds_v4"
+
+  validation {
+    condition     = startswith(var.mysql_sku, "GP_")
+    error_message = "Für die Produktivumgebung muss eine General-Purpose-SKU verwendet werden."
+  }
+}
+
+variable "mysql_high_availability_mode" {
+  description = "HA-Modus: ZoneRedundant oder SameZone"
+  type        = string
+  default     = "ZoneRedundant"
+
+  validation {
+    condition = contains(
+      ["ZoneRedundant", "SameZone"],
+      var.mysql_high_availability_mode
+    )
+    error_message = "Erlaubt sind nur ZoneRedundant und SameZone."
+  }
+}
+
+variable "mysql_storage_size_gb" {
+  description = "Speichergröße des MySQL Flexible Servers"
+  type        = number
+  default     = 64
+
+  validation {
+    condition = (
+      var.mysql_storage_size_gb >= 20 &&
+      var.mysql_storage_size_gb <= 16384
+    )
+    error_message = "Die Speichergröße muss zwischen 20 und 16384 GB liegen."
+  }
+}
+
+variable "mysql_backup_retention_days" {
+  description = "Aufbewahrungsdauer der automatischen MySQL-Backups"
+  type        = number
+  default     = 14
+
+  validation {
+    condition = (
+      var.mysql_backup_retention_days >= 1 &&
+      var.mysql_backup_retention_days <= 35
+    )
+    error_message = "Die Backup-Aufbewahrung muss zwischen 1 und 35 Tagen liegen."
+  }
 }
 
 variable "mysql_password_version" {
@@ -430,27 +478,68 @@ ephemeral "random_password" "mysql_admin" {
   min_special      = 2
 }
 
-# MySQL Flexible Server: nur privat im VNet erreichbar (kein öffentlicher Zugang).
-# Passwort wird write-only gesetzt und taucht nicht im State auf.
 resource "azurerm_mysql_flexible_server" "main" {
   name                = var.mysql_server_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  version             = "8.0.21"
-  sku_name            = var.mysql_sku
+
+  version  = "8.0.21"
+  sku_name = var.mysql_sku
 
   administrator_login               = var.mysql_admin_login
   administrator_password_wo         = ephemeral.random_password.mysql_admin.result
   administrator_password_wo_version = var.mysql_password_version
 
-  delegated_subnet_id   = azurerm_subnet.mysql.id
-  private_dns_zone_id   = azurerm_private_dns_zone.mysql.id
-  backup_retention_days = 7
+  # Privater Zugriff über das delegierte MySQL-Subnetz
+  delegated_subnet_id = azurerm_subnet.mysql.id
+  private_dns_zone_id = azurerm_private_dns_zone.mysql.id
+
+  # Automatische Point-in-Time-Backups
+  backup_retention_days = var.mysql_backup_retention_days
+
+  # Optional:
+  # Schützt zusätzlich vor einem vollständigen Ausfall der Azure-Region.
+  # Achtung: Eine spätere Änderung erzwingt laut Provider eine Neuerstellung.
+  geo_redundant_backup_enabled = false
+
+  # Primary und Standby werden in unterschiedlichen Availability Zones betrieben.
+  # Azure verwaltet Replikation und automatisches Failover.
+  high_availability {
+    mode = var.mysql_high_availability_mode
+  }
 
   storage {
-    size_gb           = 20
+    size_gb = var.mysql_storage_size_gb
+
+    # Für MySQL HA zwingend erforderlich
     auto_grow_enabled = true
+
+    # Azure passt die maximal verfügbaren IOPS automatisch an die Last an.
+    # Wenn true, darf "iops" nicht gleichzeitig gesetzt werden.
+    io_scaling_enabled = true
   }
+
+  # Ein gut passendes Wartungsfenster außerhalb der typischen Arbeitszeiten
+  maintenance_window {
+    day_of_week  = 0
+    start_hour   = 2
+    start_minute = 0
+  }
+
+  lifecycle {
+    # Nach einem HA-Failover kann der bisherige Standby zum Primary werden.
+    # Terraform soll ihn anschließend nicht zwangsweise in die alte Zone
+    # zurückverschieben.
+    ignore_changes = [
+      zone,
+      high_availability[0].standby_availability_zone,
+    ]
+  }
+
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.mysql
+  ]
+}
 
   lifecycle {
     ignore_changes = [zone]   # Azure wählt die Zone selbst
